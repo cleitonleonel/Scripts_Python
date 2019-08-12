@@ -2,6 +2,7 @@
 #
 import shutil
 import webbrowser
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -50,24 +51,20 @@ class ChannelsNetwork(Browser):
                 if category['category'] == 'dublado':
                     print(BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes'))
                     url_category_films = BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes')
-                    self.films_per_genre(url_category_films)
+                    return self.films_per_genre(url_category_films)
                 else:
                     print(BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize()))
                     url_category_films = BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize())
-                    self.films_per_genre(url_category_films)
+                    return self.films_per_genre(url_category_films)
             else:
                 info_category = self.categories(url, category['category'].capitalize() + ' ')[0]
                 print(BASE_URL + info_category['url'])
                 url_category_films = BASE_URL + info_category['url']
-                films = self.films_per_category(url_category_films)
-                print(films)
-                return info_category
+                return self.films_per_category(url_category_films)
         else:
             info_category = self.categories(url, category.capitalize() + ' ')[0]
             url_category_films = BASE_URL + info_category['url']
-            films = self.films_per_category(url_category_films)
-            print(films)
-            return info_category
+            return self.films_per_category(url_category_films)
 
     def films_per_category(self, url):
         html = self.open(url)
@@ -188,14 +185,14 @@ if __name__ == '__main__':
     #categorias = rede.categories(BASE_URL + '/browse.html')
     #print(categorias)
     #filmes = rede.films(BASE_URL + '/browse.html', category='filmes 2018')
-    #filmes = rede.films(BASE_URL, category={'category': 'lançamentos', 'genre': 'acao'})
-    #print(filmes)
-    player_url = rede.get_player('https://redecanais.rocks/capita-marvel-dublado-2019-2160p-4k_1e75c3a4f.html')
+    filmes = rede.films(BASE_URL, category={'category': 'dublado', 'genre': 'terror'})
+    print(filmes)
+    #player_url = rede.get_player('https://redecanais.rocks/capita-marvel-dublado-2019-2160p-4k_1e75c3a4f.html')
     #print(player_url)
     #video_url = rede.get_stream(url='https://cometa.top/player3/serverfplayerfree.php?vid=VNGDRSULTMTO4K', referer='https://cometa.top/player3/serverf.php?vid=VNGDRSULTMTO4K')
-    video_url = rede.get_stream(url=player_url['player'], referer=player_url['embed'])
+    #video_url = rede.get_stream(url=player_url['player'], referer=player_url['embed'])
     #print(video_url)
-    search_film = rede.search()
-    print(search_film)
+    #search_film = rede.search()
+    #print(search_film)
     #rede.download(video_url)
     #rede.play(video_url)
