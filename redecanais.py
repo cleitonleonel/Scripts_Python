@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 #
+import re
 import shutil
 import webbrowser
 
@@ -43,27 +44,31 @@ class ChannelsNetwork(Browser):
         url_search = f'{BASE_URL}/search.php?keywords={film_name}'
         return self.films_per_genre(url_search)
 
-    def films(self, url, category):
+    def films(self, url, category, page=None):
         if type(category) is dict:
             list_category = ['legendado', 'dublado', 'nacional']
             if category['category'] in list_category:
                 info_category = self.categories(url, category['category'].capitalize() + ' ')[0]
+                pages = re.compile(r'videos-(.*?)-date').findall(info_category['url'])[0]
                 if category['category'] == 'dublado':
-                    print(BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes'))
-                    url_category_films = BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes')
+                    print(BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes').replace(pages, str(category['page']) + '-date'))
+                    url_category_films = BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes').replace(pages, str(category['page']) + '-date')
                     return self.films_per_genre(url_category_films)
                 else:
-                    print(BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize()))
-                    url_category_films = BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize())
+                    print(BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize()).replace(pages, str(category['page']) + '-date'))
+                    url_category_films = BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize()).replace(pages, str(category['page']) + '-date')
                     return self.films_per_genre(url_category_films)
             else:
                 info_category = self.categories(url, category['category'].capitalize() + ' ')[0]
-                print(BASE_URL + info_category['url'])
-                url_category_films = BASE_URL + info_category['url']
+                pages = re.compile(r'videos(.*?)date').findall(info_category['url'])[0]
+                url_category_films = BASE_URL + info_category['url'].replace(pages, '-' + str(page) + '-')
+                print(url_category_films)
                 return self.films_per_category(url_category_films)
         else:
             info_category = self.categories(url, category.capitalize() + ' ')[0]
-            url_category_films = BASE_URL + info_category['url']
+            pages = re.compile(r'videos(.*?)date').findall(info_category['url'])[0]
+            url_category_films = BASE_URL + info_category['url'].replace(pages,  '-' + str(page) + '-')
+            print(url_category_films)
             return self.films_per_category(url_category_films)
 
     def films_per_category(self, url):
@@ -130,6 +135,20 @@ class ChannelsNetwork(Browser):
             with open(filename, 'wb') as f:
                 shutil.copyfileobj(r.raw, f)
 
+    def select_film(self, films):
+        print('\n')
+        for index, film in enumerate(films):
+            print(str(index) + ' == ' + film['title'])
+        print('\n')
+        selected = int(input('Digite o número correspondente ao filme que deseja assistir: '))
+        print(films[selected]['url'])
+        filme = films[selected]['url']
+        player_url = rede.get_player(filme)
+        video_url = rede.get_stream(url=player_url['player'], referer=player_url['embed'])
+        print(video_url)
+        rede.play(video_url)
+        return
+
     def play(self, url):
         start = """
 <!DOCTYPE html>
@@ -184,10 +203,24 @@ if __name__ == '__main__':
     rede = ChannelsNetwork()
     #categorias = rede.categories(BASE_URL + '/browse.html')
     #print(categorias)
-    #filmes = rede.films(BASE_URL + '/browse.html', category='filmes 2018')
-    filmes = rede.films(BASE_URL, category={'category': 'dublado', 'genre': 'terror'})
+    #filmes = rede.films(BASE_URL + '/browse.html', category='filmes 2018', page=3)
+    #search_film = rede.search()
+    #print(search_film)
+    filmes = rede.films(BASE_URL, category={'category': 'dublado', 'genre': 'terror', 'page': 2})
     print(filmes)
-    #player_url = rede.get_player('https://redecanais.rocks/capita-marvel-dublado-2019-2160p-4k_1e75c3a4f.html')
+    """print('\n')
+    for index, film in enumerate(filmes):
+        print(str(index) + ' == ' + film['title'])
+    print('\n')
+    select = int(input('Digite o número correspondente ao filme que deseja assistir: '))
+    print(filmes[select]['url'])
+    filme = filmes[select]['url']
+    player_url = rede.get_player(filme)
+    video_url = rede.get_stream(url=player_url['player'], referer=player_url['embed'])
+    print(video_url)
+    rede.play(video_url)
+    """
+    #player_url = rede.get_player('https://redecanais.rocks/doutor-estranho-dublado-2016-1080p_55218911d.html')
     #print(player_url)
     #video_url = rede.get_stream(url='https://cometa.top/player3/serverfplayerfree.php?vid=VNGDRSULTMTO4K', referer='https://cometa.top/player3/serverf.php?vid=VNGDRSULTMTO4K')
     #video_url = rede.get_stream(url=player_url['player'], referer=player_url['embed'])
@@ -196,3 +229,4 @@ if __name__ == '__main__':
     #print(search_film)
     #rede.download(video_url)
     #rede.play(video_url)
+    #select_film = rede.select_film(filmes)
