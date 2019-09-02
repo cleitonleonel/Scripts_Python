@@ -1,13 +1,34 @@
 # -*- coding: utf-8 -*-
 #
 import re
+import time
 import shutil
 import webbrowser
-
+import http.server
+import socketserver
+import threading
 import requests
 from bs4 import BeautifulSoup
 
 BASE_URL = 'https://redecanais.rocks'
+
+
+class SimpleServerHttp:
+    handler = http.server.SimpleHTTPRequestHandler
+
+    def __init__(self):
+        print('initializing...')
+        self.server = socketserver.TCPServer(("", 9090), self.handler)
+        print("Serving at port", 9090)
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.daemon = True
+
+    def start(self):
+        self.server_thread.start()
+
+    def stop(self):
+        self.server.shutdown()
+        self.server.server_close()
 
 
 class Browser:
@@ -47,16 +68,20 @@ class ChannelsNetwork(Browser):
     def films(self, url, category, page=None):
         if type(category) is dict:
             list_category = ['legendado', 'dublado', 'nacional']
+            if 'ficcao' in category['genre']:
+                genre = category['genre'] + '-filmes'
+            else:
+                genre = category['genre'].capitalize() + '-Filmes'
             if category['category'] in list_category:
                 info_category = self.categories(url, category['category'].capitalize() + ' ')[0]
                 pages = re.compile(r'videos-(.*?)-date').findall(info_category['url'])[0]
                 if category['category'] == 'dublado':
-                    print(BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes').replace(pages, str(category['page']) + '-date'))
-                    url_category_films = BASE_URL + info_category['url'].replace('filmes-dublado', category['genre'].capitalize() + '-Filmes').replace(pages, str(category['page']) + '-date')
+                    print(BASE_URL + info_category['url'].replace('filmes-dublado', genre).replace(pages, str(category['page']) + '-date'))
+                    url_category_films = BASE_URL + info_category['url'].replace('filmes-dublado', genre).replace(pages, str(category['page']) + '-date')
                     return self.films_per_genre(url_category_films)
                 else:
-                    print(BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize()).replace(pages, str(category['page']) + '-date'))
-                    url_category_films = BASE_URL + info_category['url'].replace('filmes-' + category['category'], category['genre'].capitalize() + '-Filmes-' + category['category'].capitalize()).replace(pages, str(category['page']) + '-date')
+                    print(BASE_URL + info_category['url'].replace('filmes-' + category['category'], genre + category['category'].capitalize()).replace(pages, str(category['page']) + '-date'))
+                    url_category_films = BASE_URL + info_category['url'].replace('filmes-' + category['category'], genre + '-' + category['category'].capitalize()).replace(pages, str(category['page']) + '-date')
                     return self.films_per_genre(url_category_films)
             else:
                 info_category = self.categories(url, category['category'].capitalize() + ' ')[0]
@@ -143,14 +168,16 @@ class ChannelsNetwork(Browser):
         selected = int(input('Digite o número correspondente ao filme que deseja assistir: '))
         print(films[selected]['url'])
         filme = films[selected]['url']
+        title = filmes[selected]['title']
+        img = filmes[selected]['img']
         player_url = rede.get_player(filme)
         video_url = rede.get_stream(url=player_url['player'], referer=player_url['embed'])
         print(video_url)
-        rede.play(video_url)
+        rede.play(video_url, title, img)
         return
 
-    def play(self, url):
-        start = """
+    def play(self, url, title=None, img=None):
+        html_player = """
 <!DOCTYPE html>
 <html lang="en">
 <style>
@@ -168,6 +195,22 @@ class ChannelsNetwork(Browser):
     text-align: center;
 }
 
+.google-cast-launcher {
+    float: right;
+    margin: -55px 200px 14px 0px;
+    width: 40px;
+    height: 32px;
+    opacity: 0.7;
+    background-color: #000;
+    border: none;
+    outline: none;
+}
+
+.google-cast-launcher:hover {
+    --disconnected-color: white;
+    --connected-color: white;
+}
+
 body {
     margin: 0px;
 }
@@ -175,7 +218,9 @@ body {
 <head>
     <meta charset="UTF-8">
     <title>afterglow player</title>
-    <link rel="stylesheet" href="//cdn.jsdelivr.net/afterglow/latest/afterglow.min.js" type=”text/javascript”>
+    <script rel="stylesheet" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" type="text/javascript"></script>
+    <script rel="stylesheet" src="https://fenny.github.io/ChromecastJS/chromecastjs.js" type="text/javascript"></script>
+    <script rel="stylesheet" src="https://cdn.jsdelivr.net/afterglow/latest/afterglow.min.js" type="text/javascript"></script>
 </head>
 <body>
     <div class="title">
@@ -183,20 +228,39 @@ body {
     </div>
     <div class="container">
         <div>
-            <video class="afterglow" id="myvideo" controls width="1080" height="500" autoplay="autoplay" src="%s"></video>
+            <video class="afterglow" id="myvideo" controls width="1080" height="500" autoplay="autoplay" src="%(url)s"></video>
+            
+            <button class="google-cast-launcher" is="google-cast-button"></button>
         </div>
     </div>
 </body>
 <script>
-
+    let cc = new ChromecastJS();
+    cc.on('available', function() {
+        cc.cast({
+            content:     '%(url)s',
+            poster:      '%(img)s',
+            title:       '%(title)s',
+            description: 'Filme'
+        })
+    })
 </script>
 </html>
-        """ % url
+        """
 
+        dict_details = {"url": url,
+                        "title": title,
+                        "img": img
+                        }
         with open('player.html', 'w') as f:
-            f.write(start)
-        webbrowser.open('player.html')
-        return print('Starting video')
+            f.write(html_player % dict_details)
+        simple_server = SimpleServerHttp()
+        simple_server.start()
+        webbrowser.open('http://localhost:9090/player.html')
+        print('Starting video')
+        time.sleep(360)
+        simple_server.stop()
+        return
 
 
 if __name__ == '__main__':
@@ -206,8 +270,9 @@ if __name__ == '__main__':
     #filmes = rede.films(BASE_URL + '/browse.html', category='filmes 2018', page=3)
     #search_film = rede.search()
     #print(search_film)
-    filmes = rede.films(BASE_URL, category={'category': 'dublado', 'genre': 'terror', 'page': 2})
-    print(filmes)
+    filmes = rede.films(BASE_URL, category={'category': 'dublado', 'genre': 'terror', 'page': 1})
+    #print(filmes)
+
     """print('\n')
     for index, film in enumerate(filmes):
         print(str(index) + ' == ' + film['title'])
@@ -229,4 +294,5 @@ if __name__ == '__main__':
     #print(search_film)
     #rede.download(video_url)
     #rede.play(video_url)
-    #select_film = rede.select_film(filmes)
+    select_film = rede.select_film(filmes)
+
